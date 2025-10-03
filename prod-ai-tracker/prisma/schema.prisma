@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Core data models for Productivity AI Tracker
+
+enum Outcome {
+  WIN
+  LOSS
+  MIXED
+}
+
+enum ChallengeStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum TransactionType {
+  PENALTY
+  HOURLY_MISS
+  CHALLENGE_STAKE
+  CHALLENGE_FAIL
+  REFUND
+  TOPUP
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+
+  photos        Photo[]
+  dailyScores   DailyScore[]
+  challenges    Challenge[]
+  transactions  Transaction[]
+}
+
+model Photo {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  takenAt     DateTime
+  url         String
+  storageKey  String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, takenAt])
+}
+
+model DailyScore {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  // YYYY-MM-DD string representing the day
+  date      String
+  score     Int       // 0..100 daily productivity score
+  outcome   Outcome
+  aiNotes   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Challenge {
+  id          String          @id @default(cuid())
+  user        User            @relation(fields: [userId], references: [id])
+  userId      String
+  // Day this challenge applies to, as YYYY-MM-DD
+  date        String
+  stakePaise  Int             // e.g., 1000 = ₹10
+  status      ChallengeStatus @default(PENDING)
+  settledAt   DateTime?
+  createdAt   DateTime        @default(now())
+
+  transactions Transaction[]
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Transaction {
+  id           String          @id @default(cuid())
+  user         User            @relation(fields: [userId], references: [id])
+  userId       String
+  amountPaise  Int             // positive = debit/charge, negative = credit/refund
+  type         TransactionType
+  description  String?
+  createdAt    DateTime        @default(now())
+
+  challenge    Challenge?      @relation(fields: [challengeId], references: [id])
+  challengeId  String?
+
+  @@index([userId, createdAt])
+}
